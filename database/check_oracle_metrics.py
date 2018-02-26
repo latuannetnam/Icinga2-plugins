@@ -55,7 +55,7 @@ class OracleMetrics():
                         "metric": key
                     },
                     "fields": {
-                        "value": format(value),
+                        "value": value,
                     }
                 }
             ]
@@ -84,7 +84,7 @@ class OracleMetrics():
         json_fields = {}
         for key, value in db_detail.items():
             if key != tag_key:
-                json_fields[key] = format(value)
+                json_fields[key] = value
         json_detail['fields'] = json_fields
         json_body.append(json_detail)
         # print("Write points: {0}".format(json_body))
@@ -93,13 +93,22 @@ class OracleMetrics():
     def database_availability(self):
         cursor = self.db_connection.cursor()
         cursor.execute("""
-        select (SYSDATE - startup_time)*24*3600 up_time, database_status from sys.v_$instance
+        select database_status from sys.v_$instance
+        """)
+        for detail in cursor:
+            db_detail = {}
+            db_detail['Current Status'] = detail[0]
+            self.write_data_by_tags('oracle_availability', db_detail)
+
+    def database_uptime(self):
+        cursor = self.db_connection.cursor()
+        cursor.execute("""
+        select (SYSDATE - startup_time)*24*3600 up_time from sys.v_$instance
         """)
         for detail in cursor:
             db_detail = {}
             db_detail['Up Time'] = detail[0]
-            db_detail['Current Status'] = detail[1]
-            self.write_data_by_tags('oracle_availability', db_detail)
+            self.write_data_by_tags('oracle_uptime', db_detail)
 
     def database_details(self):
         cursor = self.db_connection.cursor()
@@ -110,7 +119,7 @@ class OracleMetrics():
         """)
         for detail in cursor:
             db_detail = {}
-            db_detail['Database Created Time'] = detail[0]
+            db_detail['Database Created Time'] = format(detail[0])
             db_detail['Open Mode'] = detail[1]
             db_detail['Log Mode'] = detail[2]
             db_detail['DB Role'] = detail[3]
@@ -141,7 +150,7 @@ class OracleMetrics():
             db_detail['Members'] = detail[4]
             db_detail['Archive'] = detail[5]
             db_detail['Status'] = detail[6]
-            db_detail['First Time'] = detail[7]
+            db_detail['First Time'] = format(detail[7])
             db_detail['Member'] = detail[8]
             db_detail['Mstatus'] = detail[9]
             self.write_data_by_fields(
@@ -157,7 +166,7 @@ class OracleMetrics():
         for detail in cursor:
             db_detail = {}
             db_detail['Username'] = detail[0]
-            db_detail['Expiry Date'] = detail[1]
+            db_detail['Expiry Date'] = format(detail[1])
             db_detail['Days To Expiry'] = detail[2]
             db_detail['Account Status'] = detail[3]
             db_detail['Profile'] = detail[4]
@@ -174,7 +183,7 @@ class OracleMetrics():
             db_detail['Owner'] = detail[1]
             db_detail['Username'] = detail[2]
             db_detail['Host'] = detail[3]
-            db_detail['Created'] = detail[4]
+            db_detail['Created'] = format(detail[4])
             self.write_data_by_fields('oracle_dblinks', 'Db Link', db_detail)
 
 
@@ -218,6 +227,7 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     object = OracleMetrics(args)
+    object.database_uptime()
     object.database_availability()
     object.database_details()
     object.redo_logs()
