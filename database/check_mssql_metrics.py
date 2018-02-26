@@ -54,7 +54,7 @@ class MSSQLMetrics():
                         "metric": key
                     },
                     "fields": {
-                        "value": format(value),
+                        "value": value,
                     }
                 }
             ]
@@ -83,7 +83,7 @@ class MSSQLMetrics():
         json_fields = {}
         for key, value in db_detail.items():
             if key != tag_key:
-                json_fields[key] = format(value)
+                json_fields[key] = value
         json_detail['fields'] = json_fields
         json_body.append(json_detail)
         # print("Write points: {0}".format(json_body))
@@ -193,10 +193,10 @@ class MSSQLMetrics():
         """)
         for detail in cursor:
             db_detail = {}
-            db_detail['Start time'] = detail[0]
-            db_detail['End time'] = detail[1]
+            db_detail['Start time'] = format(detail[0])
+            db_detail['End time'] = format(detail[1])
             db_detail['Total time'] = detail[2]
-            db_detail['Size'] = detail[3]
+            db_detail['Size'] = int(detail[3])
             db_detail['Physical name'] = detail[4]
             db_detail['Backup age'] = detail[5]
             self.write_data_by_fields(
