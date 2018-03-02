@@ -107,7 +107,7 @@ class OracleMetrics():
         """)
         for detail in cursor:
             db_detail = {}
-            db_detail['Up Time'] = detail[0]
+            db_detail['Up Time'] = int(detail[0])
             self.write_data_by_tags('oracle_uptime', db_detail)
 
     def database_details(self):
