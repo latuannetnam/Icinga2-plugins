@@ -131,6 +131,112 @@ class OracleMetrics():
             db_detail['Force Logging'] = detail[9]
             self.write_data_by_tags('oracle_database_details', db_detail)
 
+    def tablespace_details(self):
+        cursor = self.db_connection.cursor()
+        cursor.execute("""
+        SELECT d.tablespace_name,
+               COUNT(d.file_name) num_datafiles,
+               NVL(SUM(decode(sign(d.maxbytes-d.bytes),1,d.maxbytes,d.bytes)),0) allocated_bytes,
+               SUM(d.blocks) allocated_blocks
+        FROM sys.dba_data_files d
+        GROUP BY d.tablespace_name
+                 union
+                 SELECT d.tablespace_name,
+                        COUNT(d.file_name) num_datafiles,
+                        NVL(SUM(d.bytes),0) allocated_bytes,
+                        SUM(d.blocks) allocated_blocks
+                 FROM sys.dba_temp_files d
+                 GROUP BY d.tablespace_name order by tablespace_name
+        """)
+        for detail in cursor:
+            db_detail = {}
+            db_detail['Tablespace'] = detail[0]
+            db_detail['Datafiles'] = detail[1]
+            db_detail['AllocatedBytes'] = detail[2]
+            db_detail['allocatedBlocks'] = detail[3]
+            self.write_data_by_fields(
+                'oracle_tablespace_details', 'Tablespace', db_detail)
+
+    def tablespace_status_1(self):
+        cursor = self.db_connection.cursor()
+        cursor.execute("""
+        SELECT d.tablespace_name,
+               SUM(f.phyrds) phyrds,
+               SUM(f.phywrts) phywrts,
+               SUM(f.readtim) readtim,
+               SUM(f.writetim) writetim
+        FROM sys.dba_data_files d,
+                    V$filestat f
+        WHERE d.file_id = f.file#
+        GROUP BY d.tablespace_name
+        ORDER by d.tablespace_name
+        """)
+        for detail in cursor:
+            db_detail = {}
+            db_detail['Tablespace'] = detail[0]
+            db_detail['Reads'] = detail[1]
+            db_detail['Writes'] = detail[2]
+            db_detail['Readtime'] = detail[3]
+            db_detail['Writetime'] = detail[4]
+            self.write_data_by_fields(
+                'oracle_tablespace_status_1', 'Tablespace', db_detail)
+
+    def tablespace_status_2(self):
+        cursor = self.db_connection.cursor()
+        cursor.execute("""
+        SELECT t.tablespace_name,
+               t.contents,
+               t.status,
+               NVL(df.allocated_bytes,0)-NVL((NVL(f.free_bytes,0)+df.max_free_bytes),0) usedBytes,
+               NVL((NVL(f.free_bytes,0)+df.max_free_bytes),0) freeBytes,
+               NVL(f.free_blocks,0) freeBlocks
+        FROM sys.dba_tablespaces t,
+             (select ff.tablespace_name,sum(ff.free_bytes) free_bytes,
+                     sum(ff.free_blocks) free_blocks
+              from
+                (SELECT fs.tablespace_name,
+                        SUM(fs.bytes) free_bytes,
+                        SUM(fs.blocks) free_blocks
+                 FROM sys.dba_free_space fs,
+                      sys.dba_data_files dfs
+                 WHERE fs.file_id=dfs.file_id
+                 GROUP BY fs.tablespace_name,
+                          dfs.autoextensible
+                ) ff
+              group by tablespace_name
+             ) f,
+             (select dff.tablespace_name,
+                     sum(dff.allocated_bytes) allocated_bytes,
+                     sum(dff.max_free_bytes) max_free_bytes
+              from
+                (select tablespace_name,
+                        autoextensible,
+                        sum(decode(sign(maxbytes-bytes),
+                        1,
+                        maxbytes,
+                        bytes
+                )
+              ) allocated_bytes,
+              sum(decode(sign(maxbytes-bytes),
+              1,
+              abs(maxbytes-bytes),0)) max_free_bytes
+        from dba_data_files
+        group by tablespace_name,autoextensible) dff
+        group by tablespace_name) df
+        WHERE t.tablespace_name = f.tablespace_name(+)
+              and t.tablespace_name=df.tablespace_name(+) order by tablespace_name
+        """)
+        for detail in cursor:
+            db_detail = {}
+            db_detail['Tablespace'] = detail[0]
+            db_detail['Contents'] = detail[1]
+            db_detail['Status'] = detail[2]
+            db_detail['Usedbytes'] = detail[3]
+            db_detail['Freebytes'] = detail[4]
+            db_detail['Freeblocks'] = detail[5]
+            self.write_data_by_fields(
+                'oracle_tablespace_status_2', 'Tablespace', db_detail)
+
     def redo_logs(self):
         cursor = self.db_connection.cursor()
         cursor.execute("""
@@ -230,6 +336,9 @@ if __name__ == "__main__":
     object.database_uptime()
     object.database_availability()
     object.database_details()
+    object.tablespace_details()
+    object.tablespace_status_1()
+    object.tablespace_status_2()
     object.redo_logs()
     object.oracle_users()
     object.oracle_dblinks()
