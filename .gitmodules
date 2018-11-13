@@ -1,0 +1,3 @@
+[submodule "perl-nagios-plugins"]
+	path = perl-nagios-plugins
+	url = https://github.com/latuannetnam/perl-nagios-plugins
